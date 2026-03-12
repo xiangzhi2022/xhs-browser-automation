@@ -29,23 +29,7 @@ run_ab() {
 
 paste_image_to_gemini() {
   local image_path="$1"
-  local mime
-  case "${image_path,,}" in
-    *.png) mime="image/png" ;;
-    *.webp) mime="image/webp" ;;
-    *) mime="image/jpeg" ;;
-  esac
-  local tmp_b64
-  tmp_b64="$(mktemp)"
-  python3 - <<'PY' "$image_path" > "$tmp_b64"
-import base64,sys
-with open(sys.argv[1],'rb') as f:
-    print(base64.b64encode(f.read()).decode())
-PY
-  local b64
-  b64="$(cat "$tmp_b64")"
-  rm -f "$tmp_b64"
-  run_ab eval "(async () => { const b64 = '$b64'; const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const blob = new Blob([bytes], {type: '$mime'}); await navigator.clipboard.write([new ClipboardItem({'$mime': blob})]); return {ok:true, mime:'$mime'}; })()"
+  python3 "$ROOT/scripts/set_image_clipboard.py" "$image_path"
   run_ab find label "为 Gemini 输入提示" click || true
   run_ab key Control+V || true
 }
@@ -76,8 +60,14 @@ ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$before_list" || true
 
 run_ab open "https://gemini.google.com/app" || true
 run_ab wait 3000 || true
-# Force a clean new-chat state before each run
-run_ab find text "发起新对话" click || true
+# Force a clean new-chat state before each run (avoid tooltip text collisions)
+run_ab eval '
+(() => {
+  const btn = document.querySelector("[data-test-id=new-chat-button] button, [data-test-id=new-chat-button]");
+  if (!btn) return {ok:false, reason:"no-new-chat-button"};
+  btn.click();
+  return {ok:true};
+})()' || true
 run_ab wait 2000 || true
 run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
 run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
