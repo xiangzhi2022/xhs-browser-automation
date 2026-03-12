@@ -35,6 +35,11 @@ Use a real Gemini web account (no Google API key) to generate images through bro
 - Take screenshots for debugging
 - Extract image URLs if possible
 - Download images into the run artifact directory
+- Current verified Gemini UI markers from live testing:
+  - prompt textbox appears as `textbox "为 Gemini 输入提示"`
+  - image mode can appear as `button "🖼️ 制作图片"`
+  - send button can appear as `button "发送"`
+  - result actions can include `button "下载完整尺寸的图片"`
 
 ### Phase 4 — Build metadata
 - Save prompt used
