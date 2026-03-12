@@ -55,10 +55,26 @@ Use a real Gemini web account (no Google API key) to generate images through bro
 ## Session strategy
 
 Recommended:
-- Use a dedicated `agent-browser` session name for Gemini
-- Save auth state under `state/gemini-auth.json`
+- Use real Chrome via CDP instead of logging in inside a Playwright-managed browser
+- Start Chrome with `--remote-debugging-port=9222 --user-data-dir=$HOME/.cache/chrome-gemini-debug`
+- Let `agent-browser --cdp 9222 ...` control the already logged-in page
 - Use headed mode during setup/debugging
 - Use headless mode only after the flow is stable
+
+## Verified live Gemini UI flow
+
+Verified on this host with a real Gemini web account:
+- open Gemini with `agent-browser --cdp 9222 open https://gemini.google.com/`
+- textbox appears as `textbox "为 Gemini 输入提示"`
+- image mode can appear as `button "🖼️ 制作图片"`
+- send button can appear as `button "发送"`
+- result actions can include `button "下载完整尺寸的图片"`
+- upload menu path is:
+  - `button "打开文件上传菜单"`
+  - then `menuitem "上传文件. 文档、数据、代码文件"`
+
+Current remaining gap:
+- the page exposes a hidden `input[type=file][name="Filedata"]`, but direct scripted upload still needs one more interaction workaround.
 
 ## Failure handling
 

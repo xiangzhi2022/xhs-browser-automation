@@ -24,6 +24,10 @@ The original repo represents an end-to-end Xiaohongshu posting pipeline:
 - Browser automation opens source/result websites
 - Saves representative reference images into the run folder
 - Records source URL and local file mapping
+- Current status on this host:
+  - source URLs/snippets are collected successfully
+  - some local reference files are already being saved under `refs/`
+  - quality filtering still needs improvement to avoid irrelevant PDFs/search pages
 
 ### Phase 3 — Asset generation/collection
 - Browser automation opens the target image-generation website (Gemini web)
