@@ -51,19 +51,19 @@ before_list="$OUT_DIR/downloads.before.txt"
 after_list="$OUT_DIR/downloads.after.txt"
 ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$before_list" || true
 
-run_ab open "https://gemini.google.com/"
+run_ab open "https://gemini.google.com/app" || true
 run_ab wait 3000 || true
 run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
 run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
 
-# Optional reference uploads (verified live with hidden Filedata input workaround)
+# Optional reference uploads (dynamic labels instead of unstable refs)
 REFS_DIR="${REFS_DIR:-}"
 if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
   mapfile -t REF_FILES < <(find "$REFS_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | head -n 3)
   if [ "${#REF_FILES[@]}" -gt 0 ]; then
-    run_ab click @e44 || true
+    run_ab find label "打开文件上传菜单" click || true
     run_ab wait 500 || true
-    run_ab click @e49 || true
+    run_ab find text "上传文件" click || true
     run_ab wait 300 || true
     run_ab eval '
 (() => {
@@ -82,11 +82,12 @@ if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
   fi
 fi
 
-# Verified live UI sequence
-run_ab click @e31 2>/dev/null || run_ab click @e49 || true
-run_ab fill @e31 "$PROMPT" 2>/dev/null || run_ab fill @e49 "$PROMPT"
+# Dynamic Gemini UI sequence
+run_ab find text "制作图片" click || true
+run_ab fill 'textarea, div[contenteditable="true"], input[aria-label*="Gemini"], input[placeholder*="Gemini"]' "$PROMPT" 2>/dev/null || \
+run_ab find label "为 Gemini 输入提示" fill "$PROMPT" || true
 run_ab snapshot -i --json > "$OUT_DIR/02-filled.snapshot.json" || true
-run_ab click @e36 2>/dev/null || run_ab click @e55
+run_ab find text "发送" click || true
 run_ab wait 12000 || true
 run_ab screenshot "$OUT_DIR/screenshots/02-generating.png" || true
 
@@ -114,7 +115,7 @@ JSON
 fi
 
 run_ab screenshot "$OUT_DIR/screenshots/03-result.png" || true
-run_ab click @e38
+run_ab find text "下载完整尺寸的图片" click || true
 sleep 5
 ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$after_list" || true
 
