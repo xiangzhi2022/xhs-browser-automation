@@ -64,6 +64,14 @@ REFS_DIR=/absolute/path/to/refs bash scripts/gemini_batch_generate.sh "义乌｜
 REFS_DIR=/absolute/path/to/body-images bash scripts/gemini_generate_cover.sh "义乌｜阳光下成长｜剪纸作品" "义乌" "阳光下成长"
 ```
 
+### 7. Experimental: paste a local image into Gemini without upload dialog
+
+```bash
+bash scripts/gemini_paste_image_experiment.sh /absolute/path/to/image.png
+```
+
+This uses the browser clipboard API plus `Ctrl+V`, and verifies the page shows `图片预览` / `移除文件`.
+
 Artifacts are written under:
 
 ```bash
