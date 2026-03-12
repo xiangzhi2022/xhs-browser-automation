@@ -73,8 +73,14 @@ Verified on this host with a real Gemini web account:
   - `button "打开文件上传菜单"`
   - then `menuitem "上传文件. 文档、数据、代码文件"`
 
-Current remaining gap:
-- the page exposes a hidden `input[type=file][name="Filedata"]`, but direct scripted upload still needs one more interaction workaround.
+Verified upload workaround:
+- click `打开文件上传菜单`
+- click `上传文件. 文档、数据、代码文件`
+- a hidden `input[type=file][name="Filedata"]` appears in the DOM
+- use JS to temporarily make it visible/interactable
+- then call `agent-browser upload 'input[type=file]' <files...>`
+
+This successfully feeds local reference images into Gemini's upload flow on this host.
 
 ## Failure handling
 

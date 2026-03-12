@@ -56,11 +56,37 @@ run_ab wait 3000 || true
 run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
 run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
 
+# Optional reference uploads (verified live with hidden Filedata input workaround)
+REFS_DIR="${REFS_DIR:-}"
+if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
+  mapfile -t REF_FILES < <(find "$REFS_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | head -n 3)
+  if [ "${#REF_FILES[@]}" -gt 0 ]; then
+    run_ab click @e44 || true
+    run_ab wait 500 || true
+    run_ab click @e49 || true
+    run_ab wait 300 || true
+    run_ab eval '
+(() => {
+  const input = document.querySelector("input[type=file]");
+  if (!input) return {ok:false};
+  input.style.display = "block";
+  input.style.visibility = "visible";
+  input.style.opacity = "1";
+  input.style.pointerEvents = "auto";
+  return {ok:true};
+})()'
+    run_ab upload 'input[type=file]' "${REF_FILES[@]}"
+    run_ab wait 3000 || true
+    printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
+    run_ab screenshot "$OUT_DIR/screenshots/01b-uploaded-refs.png" || true
+  fi
+fi
+
 # Verified live UI sequence
-run_ab click @e31
-run_ab fill @e31 "$PROMPT"
+run_ab click @e31 2>/dev/null || run_ab click @e49 || true
+run_ab fill @e31 "$PROMPT" 2>/dev/null || run_ab fill @e49 "$PROMPT"
 run_ab snapshot -i --json > "$OUT_DIR/02-filled.snapshot.json" || true
-run_ab click @e36
+run_ab click @e36 2>/dev/null || run_ab click @e55
 run_ab wait 12000 || true
 run_ab screenshot "$OUT_DIR/screenshots/02-generating.png" || true
 
