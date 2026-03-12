@@ -53,6 +53,9 @@ ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$before_list" || true
 
 run_ab open "https://gemini.google.com/app" || true
 run_ab wait 3000 || true
+# Force a clean new-chat state before each run
+run_ab find text "发起新对话" click || true
+run_ab wait 2000 || true
 run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
 run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
 
