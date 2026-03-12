@@ -82,13 +82,31 @@ if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
   return {ok:true};
 })()'
     run_ab wait 300 || true
-    if run_ab upload 'input[type=file]' "${REF_FILES[@]}"; then
-      run_ab wait 3000 || true
-      printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
-      run_ab screenshot "$OUT_DIR/screenshots/01b-uploaded-refs.png" || true
-    else
-      echo "reference upload failed; continuing with text-only generation" > "$OUT_DIR/upload-warning.txt"
+    upload_ok=0
+    for attempt in 1 2 3; do
+      if run_ab upload 'input[type=file]' "${REF_FILES[@]}"; then
+        run_ab wait 2500 || true
+        run_ab snapshot -i -c > "$OUT_DIR/upload-check-$attempt.txt" || true
+        if grep -Eq '移除文件|图片预览' "$OUT_DIR/upload-check-$attempt.txt"; then
+          upload_ok=1
+          break
+        fi
+      fi
+      run_ab wait 1000 || true
+    done
+    if [ "$upload_ok" -ne 1 ]; then
+      run_ab screenshot "$OUT_DIR/screenshots/01b-upload-failed.png" || true
+      cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "upload_failed",
+  "message": "Reference images were not confirmed on page; generation aborted."
+}
+JSON
+      echo "Reference upload not confirmed; aborting run: $OUT_DIR"
+      exit 3
     fi
+    printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
+    run_ab screenshot "$OUT_DIR/screenshots/01b-uploaded-refs.png" || true
   fi
 fi
 
