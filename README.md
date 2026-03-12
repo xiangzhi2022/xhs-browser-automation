@@ -52,6 +52,18 @@ bash scripts/gemini_generate_run.sh "杭州西湖剪纸风"
 REFS_DIR=/absolute/path/to/refs bash scripts/gemini_generate_run.sh "义乌｜阳光下成长｜剪纸作品" "请参考已上传图片，生成一张适合小学生艺术节参赛的红色剪纸作品图，主题为义乌、阳光下成长、儿童校园氛围，主体明确，纯白背景，竖版3:4。"
 ```
 
+### 5. Batch-generate body images
+
+```bash
+REFS_DIR=/absolute/path/to/refs bash scripts/gemini_batch_generate.sh "义乌｜阳光下成长｜剪纸作品" "义乌" "阳光下成长"
+```
+
+### 6. Generate a cover from selected/generated images
+
+```bash
+REFS_DIR=/absolute/path/to/body-images bash scripts/gemini_generate_cover.sh "义乌｜阳光下成长｜剪纸作品" "义乌" "阳光下成长"
+```
+
 Artifacts are written under:
 
 ```bash

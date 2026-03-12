@@ -36,18 +36,24 @@ The original repo represents an end-to-end Xiaohongshu posting pipeline:
 - Waits for results
 - Downloads/saves generated assets into a timestamped run folder
 
-### Phase 3 — Asset review/selection
+### Phase 4 — Asset review/selection
 - Keep a metadata file per candidate
 - Rank candidates using a deterministic score rubric
-- Select top N assets
+- Select top N assets for body images
+- Xiaohongshu target range: 3–17 body images
 
-### Phase 4 — Post packaging
-- Build a cover asset from chosen topic/asset set
+### Phase 5 — Cover generation
+- Reuse selected/generated body images as reference inputs
+- Run a dedicated Gemini cover prompt
+- Output one or more cover candidates optimized for Xiaohongshu thumbnail readability
+
+### Phase 6 — Post packaging
 - Build a payload JSON containing:
   - title
   - body/caption
   - tags
-  - selected images
+  - cover image
+  - selected body images
   - publish metadata
 
 ### Phase 5 — Scheduled publish
