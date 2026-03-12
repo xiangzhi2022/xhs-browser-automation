@@ -141,14 +141,28 @@ JSON
   exit 5
 fi
 
+send_started=0
+# click first
 run_ab find text "发送" click || true
-run_ab wait 2500 || true
+run_ab wait 1800 || true
 run_ab snapshot -i -c > "$OUT_DIR/02-postsend.snapshot.txt" || true
-if ! grep -Eq '停止回答|正在加载 Nano Banana 2' "$OUT_DIR/02-postsend.snapshot.txt"; then
+if grep -Eq '停止回答|正在加载 Nano Banana 2' "$OUT_DIR/02-postsend.snapshot.txt"; then
+  send_started=1
+else
+  # Enter fallback
+  run_ab find label "为 Gemini 输入提示" focus || true
+  run_ab press Enter || true
+  run_ab wait 1800 || true
+  run_ab snapshot -i -c > "$OUT_DIR/02-postsend-enter.snapshot.txt" || true
+  if grep -Eq '停止回答|正在加载 Nano Banana 2' "$OUT_DIR/02-postsend-enter.snapshot.txt"; then
+    send_started=1
+  fi
+fi
+if [ "$send_started" -ne 1 ]; then
   cat > "$OUT_DIR/result.json" <<JSON
 {
   "status": "send_not_started",
-  "message": "Send click did not transition page into generating state."
+  "message": "Neither click nor Enter transitioned page into generating state."
 }
 JSON
   echo "Send did not start generation: $OUT_DIR"
