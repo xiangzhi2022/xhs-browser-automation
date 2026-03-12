@@ -41,13 +41,13 @@ while IFS=$'\t' read -r idx name prompt; do
   RUN_LOG="$BATCH_DIR/runs/${idx}-${name}.log"
   echo "Running prompt $idx/$TARGET_COUNT: $name"
   if REFS_DIR="$REFS_DIR" bash "$ROOT/scripts/gemini_generate_run.sh" "$TOPIC" "$prompt" > "$RUN_LOG" 2>&1; then
-    echo -e "$idx\t$name\tOK\trefs-attached\t$RUN_LOG" >> "$SUCCESS_LOG"
+    echo -e "$idx\t$name\tOK\trefs-attached+sent\t$RUN_LOG" >> "$SUCCESS_LOG"
   else
-    if grep -q 'upload_failed' "$RUN_LOG" 2>/dev/null; then
-      echo -e "$idx\t$name\tFAIL\tupload_failed\t$RUN_LOG" >> "$SUCCESS_LOG"
-    else
-      echo -e "$idx\t$name\tFAIL\trun_failed\t$RUN_LOG" >> "$SUCCESS_LOG"
-    fi
+    status=run_failed
+    for s in upload_failed refs_not_attached prompt_box_missing send_not_started generation_timeout; do
+      if grep -q "$s" "$RUN_LOG" 2>/dev/null; then status="$s"; break; fi
+    done
+    echo -e "$idx\t$name\tFAIL\t$status\t$RUN_LOG" >> "$SUCCESS_LOG"
   fi
   sleep 2
 done < "$BATCH_DIR/prompts/index.tsv"

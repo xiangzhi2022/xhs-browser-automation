@@ -110,12 +110,50 @@ JSON
   fi
 fi
 
-# Dynamic Gemini UI sequence
+# Dynamic Gemini UI sequence with strict pre-send validation
 run_ab find text "制作图片" click || true
 run_ab fill 'textarea, div[contenteditable="true"], input[aria-label*="Gemini"], input[placeholder*="Gemini"]' "$PROMPT" 2>/dev/null || \
 run_ab find label "为 Gemini 输入提示" fill "$PROMPT" || true
 run_ab snapshot -i --json > "$OUT_DIR/02-filled.snapshot.json" || true
+run_ab snapshot -i -c > "$OUT_DIR/02-filled.snapshot.txt" || true
+
+# Require prompt area + refs attached (if REFS_DIR provided) before send
+if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
+  if ! grep -Eq '移除文件|图片预览' "$OUT_DIR/02-filled.snapshot.txt"; then
+    cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "refs_not_attached",
+  "message": "Reference files were expected but not visible before send."
+}
+JSON
+    echo "References not attached before send: $OUT_DIR"
+    exit 4
+  fi
+fi
+if ! grep -q '为 Gemini 输入提示' "$OUT_DIR/02-filled.snapshot.txt"; then
+  cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "prompt_box_missing",
+  "message": "Prompt box not visible before send."
+}
+JSON
+  echo "Prompt box missing before send: $OUT_DIR"
+  exit 5
+fi
+
 run_ab find text "发送" click || true
+run_ab wait 2500 || true
+run_ab snapshot -i -c > "$OUT_DIR/02-postsend.snapshot.txt" || true
+if ! grep -Eq '停止回答|正在加载 Nano Banana 2' "$OUT_DIR/02-postsend.snapshot.txt"; then
+  cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "send_not_started",
+  "message": "Send click did not transition page into generating state."
+}
+JSON
+  echo "Send did not start generation: $OUT_DIR"
+  exit 6
+fi
 run_ab wait 12000 || true
 run_ab screenshot "$OUT_DIR/screenshots/02-generating.png" || true
 
