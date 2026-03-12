@@ -27,6 +27,29 @@ run_ab() {
   agent-browser --cdp "$CDP_PORT" "$@"
 }
 
+paste_image_to_gemini() {
+  local image_path="$1"
+  local mime
+  case "${image_path,,}" in
+    *.png) mime="image/png" ;;
+    *.webp) mime="image/webp" ;;
+    *) mime="image/jpeg" ;;
+  esac
+  local tmp_b64
+  tmp_b64="$(mktemp)"
+  python3 - <<'PY' "$image_path" > "$tmp_b64"
+import base64,sys
+with open(sys.argv[1],'rb') as f:
+    print(base64.b64encode(f.read()).decode())
+PY
+  local b64
+  b64="$(cat "$tmp_b64")"
+  rm -f "$tmp_b64"
+  run_ab eval "(async () => { const b64 = '$b64'; const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const blob = new Blob([bytes], {type: '$mime'}); await navigator.clipboard.write([new ClipboardItem({'$mime': blob})]); return {ok:true, mime:'$mime'}; })()"
+  run_ab find label "为 Gemini 输入提示" click || true
+  run_ab key Control+V || true
+}
+
 json_escape() {
   python3 - <<'PY' "$1"
 import json,sys
@@ -59,53 +82,30 @@ run_ab wait 2000 || true
 run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
 run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
 
-# Optional reference uploads (dynamic labels instead of unstable refs)
+# Optional reference attachment via browser clipboard paste (no upload dialog)
 REFS_DIR="${REFS_DIR:-}"
 if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
   mapfile -t REF_FILES < <(find "$REFS_DIR" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | head -n 3)
   if [ "${#REF_FILES[@]}" -gt 0 ]; then
-    run_ab find label "打开文件上传菜单" click || true
-    run_ab wait 500 || true
-    run_ab eval '
-(() => {
-  const btn = document.querySelector("button[data-test-id=local-images-files-uploader-button]");
-  if (!btn) return {ok:false, reason:"no-upload-button"};
-  btn.click();
-  return {ok:true};
-})()'
-    run_ab wait 500 || true
-    run_ab eval '
-(() => {
-  let input = document.querySelector("input[type=file]");
-  if (!input) return {ok:false, reason:"no-input"};
-  input.style.display = "block";
-  input.style.visibility = "visible";
-  input.style.opacity = "1";
-  input.style.pointerEvents = "auto";
-  return {ok:true};
-})()'
-    run_ab wait 300 || true
-    upload_ok=0
-    for attempt in 1 2 3; do
-      if run_ab upload 'input[type=file]' "${REF_FILES[@]}"; then
-        run_ab wait 2500 || true
-        run_ab snapshot -i -c > "$OUT_DIR/upload-check-$attempt.txt" || true
-        if grep -Eq '移除文件|图片预览' "$OUT_DIR/upload-check-$attempt.txt"; then
-          upload_ok=1
-          break
-        fi
-      fi
-      run_ab wait 1000 || true
+    paste_ok=0
+    for ref_file in "${REF_FILES[@]}"; do
+      paste_image_to_gemini "$ref_file" || true
+      run_ab wait 1200 || true
     done
-    if [ "$upload_ok" -ne 1 ]; then
-      run_ab screenshot "$OUT_DIR/screenshots/01b-upload-failed.png" || true
+    run_ab wait 1500 || true
+    run_ab snapshot -i -c > "$OUT_DIR/01b-paste-check.txt" || true
+    if grep -Eq '移除文件|图片预览' "$OUT_DIR/01b-paste-check.txt"; then
+      paste_ok=1
+    fi
+    if [ "$paste_ok" -ne 1 ]; then
+      run_ab screenshot "$OUT_DIR/screenshots/01b-paste-failed.png" || true
       cat > "$OUT_DIR/result.json" <<JSON
 {
   "status": "upload_failed",
-  "message": "Reference images were not confirmed on page; generation aborted."
+  "message": "Reference images were not confirmed on page after clipboard paste; generation aborted."
 }
 JSON
-      echo "Reference upload not confirmed; aborting run: $OUT_DIR"
+      echo "Reference paste not confirmed; aborting run: $OUT_DIR"
       exit 3
     fi
     printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
