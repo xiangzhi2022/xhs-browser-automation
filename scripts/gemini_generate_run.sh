@@ -2,49 +2,134 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SESSION="${AGENT_BROWSER_SESSION:-gemini-xhs}"
-STATE_FILE="${STATE_FILE:-$ROOT/state/gemini-auth.json}"
+SESSION_ENV="$ROOT/state/session.env"
+if [ -f "$SESSION_ENV" ]; then
+  # shellcheck disable=SC1090
+  source "$SESSION_ENV"
+fi
+
+export PATH="$HOME/.npm-global/bin:$PATH"
+CDP_PORT="${CDP_PORT:-9222}"
+DOWNLOAD_DIR="${DOWNLOAD_DIR:-$HOME/下载}"
+if [ ! -d "$DOWNLOAD_DIR" ]; then
+  DOWNLOAD_DIR="${DOWNLOAD_DIR_FALLBACK:-$HOME/Downloads}"
+fi
+
 TOPIC="${1:-测试主题}"
-PROMPT="${2:-为\"$TOPIC\"生成一张适合小红书封面的高质量图片，构图清晰，主体突出，色彩干净，适合移动端浏览。}"
+PROMPT="${2:-为\"$TOPIC\"生成一张适合小红书封面的高质量插画图片，构图清晰，主体突出，色彩干净，适合移动端浏览。}"
 RUN_DATE="$(date +%F)"
 RUN_TS="$(date +%F-%H%M%S)"
 SAFE_TOPIC="$(printf '%s' "$TOPIC" | tr ' /' '__')"
 OUT_DIR="$ROOT/artifacts/$RUN_DATE/$RUN_TS-$SAFE_TOPIC"
 mkdir -p "$OUT_DIR/screenshots"
 
+run_ab() {
+  agent-browser --cdp "$CDP_PORT" "$@"
+}
+
+json_escape() {
+  python3 - <<'PY' "$1"
+import json,sys
+print(json.dumps(sys.argv[1], ensure_ascii=False))
+PY
+}
+
+STARTED_AT="$(date --iso-8601=seconds)"
+PROMPT_JSON=$(json_escape "$PROMPT")
+TOPIC_JSON=$(json_escape "$TOPIC")
 cat > "$OUT_DIR/run.json" <<JSON
 {
-  "topic": "$TOPIC",
-  "prompt": "$PROMPT",
-  "startedAt": "$(date --iso-8601=seconds)",
+  "topic": $TOPIC_JSON,
+  "prompt": $PROMPT_JSON,
+  "startedAt": "$STARTED_AT",
   "status": "started"
 }
 JSON
-
 printf '%s\n' "$PROMPT" > "$OUT_DIR/prompt.txt"
 
-if [ ! -f "$STATE_FILE" ]; then
-  echo "Missing state file: $STATE_FILE"
-  echo "Run scripts/gemini_generate_session.sh first."
-  exit 1
+before_list="$OUT_DIR/downloads.before.txt"
+after_list="$OUT_DIR/downloads.after.txt"
+ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$before_list" || true
+
+run_ab open "https://gemini.google.com/"
+run_ab wait 3000 || true
+run_ab screenshot "$OUT_DIR/screenshots/01-open.png" || true
+run_ab snapshot -i --json > "$OUT_DIR/01-open.snapshot.json" || true
+
+# Verified live UI sequence
+run_ab click @e31
+run_ab fill @e31 "$PROMPT"
+run_ab snapshot -i --json > "$OUT_DIR/02-filled.snapshot.json" || true
+run_ab click @e36
+run_ab wait 12000 || true
+run_ab screenshot "$OUT_DIR/screenshots/02-generating.png" || true
+
+# Wait until result actions show up. Retry a few times.
+found_download=0
+for i in 1 2 3 4 5; do
+  run_ab snapshot -i -c > "$OUT_DIR/03-result-$i.snapshot.txt" || true
+  if grep -q '下载完整尺寸的图片' "$OUT_DIR/03-result-$i.snapshot.txt"; then
+    found_download=1
+    break
+  fi
+  run_ab wait 5000 || true
+done
+
+if [ "$found_download" -ne 1 ]; then
+  run_ab screenshot "$OUT_DIR/screenshots/03-timeout.png" || true
+  cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "generation_timeout",
+  "message": "Did not detect download button within retry window."
+}
+JSON
+  echo "Generation did not finish in time: $OUT_DIR"
+  exit 2
 fi
 
-agent-browser --session "$SESSION" state load "$STATE_FILE"
-agent-browser --session "$SESSION" open "https://gemini.google.com/"
-agent-browser --session "$SESSION" wait 3000 || true
-agent-browser --session "$SESSION" screenshot "$OUT_DIR/screenshots/01-open.png" || true
-agent-browser --session "$SESSION" snapshot -i --json > "$OUT_DIR/generation.snapshot.json" || true
+run_ab screenshot "$OUT_DIR/screenshots/03-result.png" || true
+run_ab click @e38
+sleep 5
+ls -1t "$DOWNLOAD_DIR" 2>/dev/null > "$after_list" || true
 
-cat > "$OUT_DIR/NEXT_STEPS.md" <<'EOF'
-This run created the artifact folder and loaded the Gemini session.
+NEW_FILE="$(python3 - <<'PY' "$before_list" "$after_list"
+import sys
+before=set()
+after=[]
+try:
+    before=set(open(sys.argv[1], encoding='utf-8', errors='ignore').read().splitlines())
+except FileNotFoundError:
+    pass
+try:
+    after=open(sys.argv[2], encoding='utf-8', errors='ignore').read().splitlines()
+except FileNotFoundError:
+    after=[]
+for name in after:
+    if name and name not in before:
+        print(name)
+        break
+PY
+)"
 
-Complete the Gemini-specific interaction logic next:
-1. inspect generation.snapshot.json
-2. identify the prompt box/button refs
-3. fill prompt
-4. trigger generation
-5. wait for result images
-6. download or capture result URLs
-EOF
+DOWNLOADED_TO=""
+if [ -n "$NEW_FILE" ] && [ -f "$DOWNLOAD_DIR/$NEW_FILE" ]; then
+  mkdir -p "$OUT_DIR/downloads"
+  cp "$DOWNLOAD_DIR/$NEW_FILE" "$OUT_DIR/downloads/$NEW_FILE"
+  DOWNLOADED_TO="$OUT_DIR/downloads/$NEW_FILE"
+fi
 
-echo "Initialized Gemini web run at: $OUT_DIR"
+cat > "$OUT_DIR/result.json" <<JSON
+{
+  "status": "ok",
+  "downloadDetected": $( [ -n "$DOWNLOADED_TO" ] && echo true || echo false ),
+  "downloadedTo": $(json_escape "$DOWNLOADED_TO"),
+  "finishedAt": "$(date --iso-8601=seconds)"
+}
+JSON
+
+echo "Run finished: $OUT_DIR"
+if [ -n "$DOWNLOADED_TO" ]; then
+  echo "Downloaded file copied to: $DOWNLOADED_TO"
+else
+  echo "No new download file was confidently identified; inspect $DOWNLOAD_DIR and $OUT_DIR/screenshots"
+fi

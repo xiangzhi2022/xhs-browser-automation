@@ -26,9 +26,36 @@ This repo contains:
 - scheduler wrapper skeleton
 - artifact directory structure
 
+## Gemini web automation quick start
+
+### 1. Start dedicated Chrome with CDP
+
+```bash
+google-chrome --remote-debugging-port=9222 --user-data-dir=$HOME/.cache/chrome-gemini-debug
+```
+
+### 2. Bootstrap session config
+
+```bash
+bash scripts/gemini_generate_session.sh
+```
+
+### 3. Run one Gemini image generation
+
+```bash
+bash scripts/gemini_generate_run.sh "杭州西湖剪纸风"
+```
+
+Artifacts are written under:
+
+```bash
+artifacts/YYYY-MM-DD/<timestamp>-<topic>/
+```
+
 ## Next steps
 
-- wire actual browser steps for target websites
-- define login/session strategy
+- make Gemini UI selectors more resilient than fixed refs
+- improve download-file detection
+- add post-processing / selection steps
 - implement publish flow
 - connect cron delivery/reporting
