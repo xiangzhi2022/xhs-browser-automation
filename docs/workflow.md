@@ -13,16 +13,24 @@ The original repo represents an end-to-end Xiaohongshu posting pipeline:
 
 ## Rebuilt automation plan (no code reuse)
 
-### Phase 1 — Topic selection
+### Phase 1 — Topic selection + reference planning
 - Maintain a rotating queue of cities/topics
 - Avoid repeats within the same day
 - Allow manual override for special campaigns
+- Produce `topic.json` with city/festival/keywords
+- Produce `refs.json` with source URLs/snippets for later image collection
 
-### Phase 2 — Asset generation/collection
-- Browser automation opens the target image-generation or source website
+### Phase 2 — Reference asset collection
+- Browser automation opens source/result websites
+- Saves representative reference images into the run folder
+- Records source URL and local file mapping
+
+### Phase 3 — Asset generation/collection
+- Browser automation opens the target image-generation website (Gemini web)
 - Submits prompt/topic data
+- Optionally uploads reference images from Phase 2
 - Waits for results
-- Downloads/saves candidate assets into a timestamped run folder
+- Downloads/saves generated assets into a timestamped run folder
 
 ### Phase 3 — Asset review/selection
 - Keep a metadata file per candidate
