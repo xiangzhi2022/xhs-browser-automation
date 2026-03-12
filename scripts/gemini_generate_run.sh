@@ -63,22 +63,32 @@ if [ -n "$REFS_DIR" ] && [ -d "$REFS_DIR" ]; then
   if [ "${#REF_FILES[@]}" -gt 0 ]; then
     run_ab find label "打开文件上传菜单" click || true
     run_ab wait 500 || true
-    run_ab find text "上传文件" click || true
-    run_ab wait 300 || true
     run_ab eval '
 (() => {
-  const input = document.querySelector("input[type=file]");
-  if (!input) return {ok:false};
+  const btn = document.querySelector("button[data-test-id=local-images-files-uploader-button]");
+  if (!btn) return {ok:false, reason:"no-upload-button"};
+  btn.click();
+  return {ok:true};
+})()'
+    run_ab wait 500 || true
+    run_ab eval '
+(() => {
+  let input = document.querySelector("input[type=file]");
+  if (!input) return {ok:false, reason:"no-input"};
   input.style.display = "block";
   input.style.visibility = "visible";
   input.style.opacity = "1";
   input.style.pointerEvents = "auto";
   return {ok:true};
 })()'
-    run_ab upload 'input[type=file]' "${REF_FILES[@]}"
-    run_ab wait 3000 || true
-    printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
-    run_ab screenshot "$OUT_DIR/screenshots/01b-uploaded-refs.png" || true
+    run_ab wait 300 || true
+    if run_ab upload 'input[type=file]' "${REF_FILES[@]}"; then
+      run_ab wait 3000 || true
+      printf '%s\n' "${REF_FILES[@]}" > "$OUT_DIR/uploaded-refs.txt"
+      run_ab screenshot "$OUT_DIR/screenshots/01b-uploaded-refs.png" || true
+    else
+      echo "reference upload failed; continuing with text-only generation" > "$OUT_DIR/upload-warning.txt"
+    fi
   fi
 fi
 
